@@ -5,6 +5,8 @@ import com.azure.storage.blob.BlobClient;
 import com.azure.storage.blob.BlobContainerClient;
 import com.azure.storage.blob.BlobServiceClient;
 import com.azure.storage.blob.BlobServiceClientBuilder;
+import com.azure.storage.blob.models.BlobItem;
+import com.azure.storage.blob.models.ListBlobsOptions;
 import com.google.gson.Gson;
 import org.springframework.web.bind.annotation.*;
 import uk.ac.ed.acpstorageservice.data.StorageDataDefinition;
@@ -14,6 +16,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.UUID;
 
 /**
@@ -27,6 +30,7 @@ public class StorageServiceController {
     public static final String ACP_CONTAINER_NAME = "ACP_CONTAINER_NAME";
     public static final String FILE = "file";
     public static final String BLOB = "blob";
+    public static final String TMP = "/tmp";
 
 
     /**
@@ -92,8 +96,42 @@ public class StorageServiceController {
         return new Gson().fromJson(data, StorageDataDefinition.class);
     }
 
+    @GetMapping(value = "/list/{source}")
+    public UUID[] list(@PathVariable() String source) throws IOException {
+        source = source.toLowerCase();
+        UUID[] result = new UUID[0];
+
+        switch (source){
+            case FILE:
+                result = Files.list(Path.of(TMP)).filter(f -> {
+                    try {
+                        UUID.fromString(f.getFileName().toString());
+                        return true;
+                    } catch (Exception x) {
+                        return false;
+                    }
+                }).map(e -> UUID.fromString(e.getFileName().toString())).toArray(UUID[]::new);
+                break;
+            case BLOB:
+                var blobContainerClient = getBlobContainerClient(getBlobServiceClient());
+                result = blobContainerClient.listBlobs().stream().filter(f -> {
+                    try {
+                        UUID.fromString(f.getName());
+                        return true;
+                    } catch (Exception x) {
+                        return false;
+                    }
+                }).map(e -> UUID.fromString(e.getName())).toArray(UUID[]::new);
+                break;
+            default:
+                throw new RuntimeException("not supported");
+        }
+
+        return result;
+    }
+
     private Path getFilePath(String uniqueId){
-        return Path.of("/tmp", uniqueId);
+        return Path.of(TMP, uniqueId);
     }
 
     private BlobClient getBlobClient(UUID uniqueId){
