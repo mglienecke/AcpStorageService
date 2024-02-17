@@ -26,8 +26,6 @@ public class StorageServiceController {
     public static final String ACP_CONTAINER_NAME = "ACP_CONTAINER_NAME";
     public static final String FILE = "file";
     public static final String BLOB = "blob";
-    private String azureConnectString = null;
-    private String azureContainerName = null;
 
 
     /**
@@ -47,8 +45,9 @@ public class StorageServiceController {
      * @return a unique id for the created data
      */
     @PostMapping(value = "/write/{target}",  consumes = {"*/*"})
-    public String write(@PathVariable() String target, @RequestBody StorageDataDefinition data) throws IOException {
-        String fileIdentifier = UUID.randomUUID().toString();
+    public UUID write(@PathVariable() String target, @RequestBody StorageDataDefinition data) throws IOException {
+        UUID result = UUID.randomUUID();
+        String fileIdentifier = result.toString();
         target = target.toLowerCase();
         String dataToWrite = new Gson().toJson(data);
 
@@ -65,22 +64,29 @@ public class StorageServiceController {
                 throw new RuntimeException("not supported");
         }
 
-        return fileIdentifier;
+        return result;
     }
 
 
+    /**
+     * read a data item using a UUID
+     * @param source is where the data is stored (file or blob)
+     * @param uniqueId is the UUID for the data item
+     * @return a storage data definition
+     * @throws IOException
+     */
     @GetMapping(value = "/read/{source}/{uniqueId}")
-    public StorageDataDefinition read(@PathVariable() String source, @PathVariable() String uniqueId) throws IOException {
+    public StorageDataDefinition read(@PathVariable() String source, @PathVariable() UUID uniqueId) throws IOException {
         source = source.toLowerCase();
         String data;
 
         switch (source){
             case FILE:
-                data = Files.readString(getFilePath(uniqueId));
+                data = Files.readString(getFilePath(uniqueId.toString()));
                 break;
             case BLOB:
                 var blobContainerClient = getBlobContainerClient(getBlobServiceClient());
-                var blobClient = blobContainerClient.getBlobClient(uniqueId);
+                var blobClient = blobContainerClient.getBlobClient(uniqueId.toString());
                 data = blobClient.downloadContent().toString();
                 break;
             default:
@@ -95,35 +101,20 @@ public class StorageServiceController {
     }
 
     private BlobServiceClient getBlobServiceClient(){
+        String azureConnectString = System.getenv(ACP_STORAGE_CONNECTION_STRING);
+        if (azureConnectString == null || azureConnectString.isBlank()) {
+            throw new RuntimeException(ACP_STORAGE_CONNECTION_STRING + " is not set");
+        }
+
         return new BlobServiceClientBuilder().connectionString(azureConnectString).buildClient();
     }
 
     private BlobContainerClient getBlobContainerClient(BlobServiceClient blobServiceClient) {
-        return blobServiceClient.getBlobContainerClient(azureContainerName);
-    }
-
-    /**
-     * initialize the controller by reading the ENV variables
-     */
-    public StorageServiceController(){
-        azureConnectString = System.getenv(ACP_STORAGE_CONNECTION_STRING);
-        azureContainerName = System.getenv(ACP_CONTAINER_NAME);
-
-        boolean error = false;
-
-        if (azureConnectString == null || azureConnectString.isBlank()) {
-            System.err.println(ACP_STORAGE_CONNECTION_STRING + " is not set");
-            error = true;
-        }
-
+        String azureContainerName = System.getenv(ACP_CONTAINER_NAME);
         if (azureContainerName == null || azureContainerName.isBlank()) {
-            System.err.println(ACP_CONTAINER_NAME + " is not set");
-            error = true;
+            throw new RuntimeException(ACP_CONTAINER_NAME + " is not set");
         }
 
-        if (error){
-            System.err.println("terminating due to configuration errors...");
-            System.exit(1);
-        }
+        return blobServiceClient.getBlobContainerClient(azureContainerName);
     }
 }

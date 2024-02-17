@@ -1,4 +1,5 @@
-FROM --platform=linux/amd64 openjdk
+# FROM --platform=linux/amd64 openjdk
+FROM openjdk
 VOLUME /tmp
 EXPOSE 8080
 COPY target/AcpStorageService*.jar app.jar
