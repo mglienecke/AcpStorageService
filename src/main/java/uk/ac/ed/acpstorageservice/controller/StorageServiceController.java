@@ -1,6 +1,7 @@
 package uk.ac.ed.acpstorageservice.controller;
 
 import com.azure.core.util.BinaryData;
+import com.azure.storage.blob.BlobClient;
 import com.azure.storage.blob.BlobContainerClient;
 import com.azure.storage.blob.BlobServiceClient;
 import com.azure.storage.blob.BlobServiceClientBuilder;
@@ -47,18 +48,15 @@ public class StorageServiceController {
     @PostMapping(value = "/write/{target}",  consumes = {"*/*"})
     public UUID write(@PathVariable() String target, @RequestBody StorageDataDefinition data) throws IOException {
         UUID result = UUID.randomUUID();
-        String fileIdentifier = result.toString();
         target = target.toLowerCase();
         String dataToWrite = new Gson().toJson(data);
 
         switch (target){
             case FILE:
-                Files.writeString(getFilePath(fileIdentifier), dataToWrite, StandardCharsets.UTF_8);
+                Files.writeString(getFilePath(result.toString()), dataToWrite, StandardCharsets.UTF_8);
                 break;
             case BLOB:
-                var blobContainerClient = getBlobContainerClient(getBlobServiceClient());
-                var blobClient = blobContainerClient.getBlobClient(fileIdentifier);
-                blobClient.upload(BinaryData.fromString(dataToWrite));
+                getBlobClient(result).upload(BinaryData.fromString(dataToWrite));
                 break;
             default:
                 throw new RuntimeException("not supported");
@@ -85,9 +83,7 @@ public class StorageServiceController {
                 data = Files.readString(getFilePath(uniqueId.toString()));
                 break;
             case BLOB:
-                var blobContainerClient = getBlobContainerClient(getBlobServiceClient());
-                var blobClient = blobContainerClient.getBlobClient(uniqueId.toString());
-                data = blobClient.downloadContent().toString();
+                data = getBlobClient(uniqueId).downloadContent().toString();
                 break;
             default:
                 throw new RuntimeException("not supported");
@@ -98,6 +94,11 @@ public class StorageServiceController {
 
     private Path getFilePath(String uniqueId){
         return Path.of("/tmp", uniqueId);
+    }
+
+    private BlobClient getBlobClient(UUID uniqueId){
+        var blobContainerClient = getBlobContainerClient(getBlobServiceClient());
+        return blobContainerClient.getBlobClient(uniqueId.toString());
     }
 
     private BlobServiceClient getBlobServiceClient(){
