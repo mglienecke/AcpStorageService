@@ -96,6 +96,12 @@ public class StorageServiceController {
         return new Gson().fromJson(data, StorageDataDefinition.class);
     }
 
+    /**
+     * perform a list operation by streaming all elements of either file or blob and those which have a UUID as name will be returned
+     * @param source defines where to search
+     * @return a list of UUID names (can be empty)
+     * @throws IOException
+     */
     @GetMapping(value = "/list/{source}")
     public UUID[] list(@PathVariable() String source) throws IOException {
         source = source.toLowerCase();
