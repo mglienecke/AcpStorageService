@@ -1,9 +1,14 @@
 package uk.ac.ed.acpstorageservice.controller;
 
+import com.azure.core.util.BinaryData;
+import com.azure.storage.blob.BlobContainerClient;
+import com.azure.storage.blob.BlobServiceClient;
+import com.azure.storage.blob.BlobServiceClientBuilder;
 import com.google.gson.Gson;
 import org.springframework.web.bind.annotation.*;
 import uk.ac.ed.acpstorageservice.data.StorageDataDefinition;
 
+import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -16,6 +21,10 @@ import java.util.UUID;
 @RestController()
 @RequestMapping("storage")
 public class StorageServiceController {
+
+    private String azureConnectString = null;
+    private String azureContainerName = null;
+
 
     /**
      * a simple alive check
@@ -35,15 +44,19 @@ public class StorageServiceController {
      */
     @PostMapping(value = "/write/{target}",  consumes = {"*/*"})
     public String write(@PathVariable() String target, @RequestBody StorageDataDefinition data) throws IOException {
-        String fileIdentifier;
+        String fileIdentifier = UUID.randomUUID().toString();
         target = target.toLowerCase();
+        String dataToWrite = new Gson().toJson(data);
 
         switch (target){
             case "file":
-                fileIdentifier = writeFile(data);
+                writeFile(fileIdentifier, dataToWrite);
                 break;
             case "blob":
-                throw new RuntimeException("BLOB not yet supported");
+                var blobContainerClient = getBlobContainerClient(getBlobServiceClient());
+                var blobClient = blobContainerClient.getBlobClient(fileIdentifier);
+                blobClient.upload(BinaryData.fromString(dataToWrite));
+                break;
             default:
                 throw new RuntimeException("not supported");
         }
@@ -74,9 +87,42 @@ public class StorageServiceController {
         return Path.of("/tmp", uniqueId);
     }
 
-    private String writeFile(StorageDataDefinition data) throws IOException {
-        String filename = UUID.randomUUID().toString();
-        Files.writeString(getFilePath(filename), new Gson().toJson(data), StandardCharsets.UTF_8);
+    private String writeFile(String filename, String data) throws IOException {
+        Files.writeString(getFilePath(filename), data, StandardCharsets.UTF_8);
         return filename;
+    }
+
+    private BlobServiceClient getBlobServiceClient(){
+
+        // Create a BlobServiceClient object using a connection string
+        return new BlobServiceClientBuilder()
+                .connectionString(azureConnectString)
+                .buildClient();
+    }
+
+    private BlobContainerClient getBlobContainerClient(BlobServiceClient blobServiceClient) {
+        return blobServiceClient.getBlobContainerClient(azureContainerName);
+    }
+
+    public StorageServiceController(){
+        azureConnectString = System.getenv("ACP_STORAGE_CONNECTION_STRING");
+        azureContainerName = System.getenv("ACP_CONTAINER_NAME");
+
+        boolean error = false;
+
+        if (azureConnectString == null || azureConnectString.isBlank()) {
+            System.err.println("ACP_STORAGE_CONNECTION_STRING is not set");
+            error = true;
+        }
+
+        if (azureContainerName == null || azureContainerName.isBlank()) {
+            System.err.println("ACP_CONTAINER_NAME is not set");
+            error = true;
+        }
+
+        if (error){
+            System.err.println("terminating due to configuration errors...");
+            System.exit(1);
+        }
     }
 }
