@@ -23,7 +23,7 @@ import java.util.UUID;
  * the ILP Tutorial service which provides suppliers, orders and other useful things
  */
 @RestController()
-@RequestMapping("storage")
+// @RequestMapping("storage")
 public class StorageServiceController {
 
     public static final String ACP_STORAGE_CONNECTION_STRING = "ACP_STORAGE_CONNECTION_STRING";
