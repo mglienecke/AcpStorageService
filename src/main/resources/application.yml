@@ -1,0 +1,30 @@
+spring:
+  application:
+    name: acpStorageService
+
+
+info:
+  app:
+    name: ACP Storage Service
+    description: Simple ACP service to handle BLOBs (either file or remote on Azure)
+    version: 0.0.1
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: info, health, env
+
+  info:
+    env:
+      enabled: true
+
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+
+server:
+  port: 8080
+

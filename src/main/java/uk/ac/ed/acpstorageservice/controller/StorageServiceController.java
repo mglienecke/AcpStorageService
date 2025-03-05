@@ -1,31 +1,22 @@
 package uk.ac.ed.acpstorageservice.controller;
 
-import com.azure.core.annotation.QueryParam;
 import com.azure.core.util.BinaryData;
 import com.azure.storage.blob.BlobClient;
 import com.azure.storage.blob.BlobContainerClient;
 import com.azure.storage.blob.BlobServiceClient;
 import com.azure.storage.blob.BlobServiceClientBuilder;
-import com.azure.storage.blob.models.BlobItem;
-import com.azure.storage.blob.models.ListBlobsOptions;
 import com.google.gson.Gson;
-import org.springframework.boot.autoconfigure.data.redis.RedisProperties;
 import org.springframework.lang.NonNull;
 import org.springframework.web.bind.annotation.*;
 import redis.clients.jedis.params.SetParams;
 import uk.ac.ed.acpstorageservice.data.StorageDataDefinition;
 
-import java.io.BufferedInputStream;
-import java.io.Console;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.UUID;
-import redis.clients.jedis.Jedis;
+
 import redis.clients.jedis.JedisPool;
 /**
  * the ILP Tutorial service which provides suppliers, orders and other useful things
@@ -39,17 +30,6 @@ public class StorageServiceController {
     public static final String FILE = "file";
     public static final String BLOB = "blob";
     public static final String TMP = "/tmp";
-
-
-    /**
-     * a simple alive check
-     *
-     * @return true (always)
-     */
-    @GetMapping(value = {"/isAlive"})
-    public boolean isAlive() {
-        return true;
-    }
 
     /**
      * POST with a JSON data structure in the request body
@@ -75,9 +55,7 @@ public class StorageServiceController {
         }
 
         // now store in Redis
-        JedisPool pool = new JedisPool("localhost", 6379);
-
-        try (var jedis = pool.getResource()) {
+        try (JedisPool pool = new JedisPool("localhost", 6379); var jedis = pool.getResource()) {
             var params = new SetParams();
             params.ex(2);
             jedis.set(result.toString(), dataToWrite, params);
@@ -100,21 +78,14 @@ public class StorageServiceController {
         String data;
 
         // now store in Redis
-        JedisPool pool = new JedisPool("localhost", 6379);
-
-        try (var jedis = pool.getResource()) {
+        try (JedisPool pool = new JedisPool("localhost", 6379); var jedis = pool.getResource()) {
             data = jedis.get(uniqueId.toString());
             if (data  == null) {
-                switch (source){
-                    case FILE:
-                        data = Files.readString(getFilePath(uniqueId.toString()));
-                        break;
-                    case BLOB:
-                        data = getBlobClient(uniqueId).downloadContent().toString();
-                        break;
-                    default:
-                        throw new RuntimeException("not supported");
-                }
+                data = switch (source) {
+                    case FILE -> Files.readString(getFilePath(uniqueId.toString()));
+                    case BLOB -> getBlobClient(uniqueId).downloadContent().toString();
+                    default -> throw new RuntimeException("not supported");
+                };
             }
         }
 
@@ -137,9 +108,7 @@ public class StorageServiceController {
             }
 
             // now store in Redis
-            JedisPool pool = new JedisPool("localhost", 6379);
-
-            try (var jedis = pool.getResource()) {
+            try (JedisPool pool = new JedisPool("localhost", 6379); var jedis = pool.getResource()) {
                 jedis.unlink(uniqueId.toString());
             }
 
@@ -187,6 +156,11 @@ public class StorageServiceController {
         }
 
         return result;
+    }
+
+    @GetMapping(value = "/")
+    public UUID[] index() throws IOException {
+        return list("BLOB");
     }
 
     private Path getFilePath(String uniqueId){
