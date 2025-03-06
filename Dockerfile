@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 openjdk
+FROM openjdk
 # FROM openjdk
 VOLUME /tmp
 EXPOSE 8080

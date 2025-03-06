@@ -1,5 +1,6 @@
 package uk.ac.ed.acpstorageservice.controller;
 
+import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.boot.web.servlet.error.ErrorController;
 import org.springframework.stereotype.Controller;
@@ -14,6 +15,7 @@ import static jakarta.servlet.RequestDispatcher.FORWARD_REQUEST_URI;
 /**
  * handle global errors with a project specific better message
  */
+@Hidden
 @Controller
 public class ErrorHandler implements ErrorController {
 

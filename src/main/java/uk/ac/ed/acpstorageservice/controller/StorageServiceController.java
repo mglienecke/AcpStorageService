@@ -22,7 +22,7 @@ import redis.clients.jedis.JedisPool;
  * the ILP Tutorial service which provides suppliers, orders and other useful things
  */
 @RestController()
-// @RequestMapping("storage")
+@RequestMapping("/api/acp-storage/v1")
 public class StorageServiceController {
 
     public static final String ACP_STORAGE_CONNECTION_STRING = "ACP_STORAGE_CONNECTION_STRING";
@@ -37,7 +37,7 @@ public class StorageServiceController {
      * @param target is the write destination (file or blob)
      * @return a unique id for the created data
      */
-    @PostMapping(value = "/write/{target}",  consumes = {"*/*"})
+    @PostMapping(value = "/{target}",  consumes = {"*/*"})
     public UUID write(@PathVariable() String target, @RequestBody StorageDataDefinition data) throws IOException {
         UUID result = UUID.randomUUID();
         target = target.toLowerCase();
@@ -72,7 +72,7 @@ public class StorageServiceController {
      * @return a storage data definition
      * @throws IOException
      */
-    @GetMapping(value = "/read/{source}/{uniqueId}")
+    @GetMapping(value = "/{source}/{uniqueId}")
     public StorageDataDefinition read(@PathVariable() String source, @PathVariable() UUID uniqueId) throws IOException {
         source = source.toLowerCase();
         String data;
@@ -91,6 +91,7 @@ public class StorageServiceController {
 
         return new Gson().fromJson(data, StorageDataDefinition.class);
     }
+
     @DeleteMapping(value = "/{source}/{uniqueId}")
     public void delete(@PathVariable() String source, @PathVariable() @NonNull UUID uniqueId) throws IOException {
         source = source.toLowerCase();
@@ -124,7 +125,7 @@ public class StorageServiceController {
      * @return a list of UUID names (can be empty)
      * @throws IOException
      */
-    @GetMapping(value = "/list/{source}")
+    @GetMapping(value = "/{source}")
     public UUID[] list(@PathVariable() String source) throws IOException {
         source = source.toLowerCase();
         UUID[] result = new UUID[0];
