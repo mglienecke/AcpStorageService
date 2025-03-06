@@ -1,9 +1,10 @@
-FROM openjdk
+FROM openjdk:21
 # FROM openjdk
 VOLUME /tmp
 EXPOSE 8080
-ENV ACP_STORAGE_CONNECTION_STRING=BlobEndpoint=https://acpstorage.blob.core.windows.net/;QueueEndpoint=https://acpstorage.queue.core.windows.net/;FileEndpoint=https://acpstorage.file.core.windows.net/;TableEndpoint=https://acpstorage.table.core.windows.net/;SharedAccessSignature=sv=2022-11-02&ss=b&srt=co&sp=rwdlaciytfx&se=2024-06-01T21:03:13Z&st=2024-02-17T14:03:13Z&spr=https&sig=k4fkwPI%2F%2BRPj0iNz2UAI5cjUfn%2FSuUMGVw6efEVQ9hQ%3D
-ENV ACP_CONTAINER_NAME=acpcontainer
+ENV ACP_STORAGE_CONNECTION=BlobEndpoint=https://acpstorage.blob.core.windows.net/acpcontainer?sp=racwdli&st=2025-03-06T19:01:08Z&se=2025-05-01T02:01:08Z&spr=https&sv=2022-11-02&sr=c&sig=cVrFc2NcsOZ3U%2BITpMd1T%2BVMSEOBCAekpZhYQEIrd20%3D
+ENV ACP_BLOB_CONTAINER=acpcontainer
+ENV USE_REDIS=false
 
 
 COPY target/AcpStorageService*.jar app.jar

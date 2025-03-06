@@ -105,6 +105,15 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+
+                <configuration>
+                    <environmentVariables>
+                        <REDIS_HOST>localhost</REDIS_HOST>
+                        <REDIS_PORT>6379</REDIS_PORT>
+                        <USE_REDIS>true</USE_REDIS>
+                        <ACP_BLOB_CONTAINER>acpcontainer</ACP_BLOB_CONTAINER>
+                        <ACP_STORAGE_CONNECTION>BlobEndpoint=https://acpstorage.blob.core.windows.net/acpcontainer?sp=racwdli&amp;st=2025-03-06T19:01:08Z&amp;se=2025-05-01T02:01:08Z&amp;spr=https&amp;sv=2022-11-02&amp;sr=c&amp;sig=cVrFc2NcsOZ3U%2BITpMd1T%2BVMSEOBCAekpZhYQEIrd20%3D</ACP_STORAGE_CONNECTION>                            </environmentVariables>
+                </configuration>
             </plugin>
         </plugins>
     </build>
