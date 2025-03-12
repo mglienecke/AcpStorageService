@@ -98,6 +98,11 @@
             <artifactId>azure-identity</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>com.azure</groupId>
+            <artifactId>azure-cosmos</artifactId>
+            <version>LATEST</version>
+        </dependency>
     </dependencies>
 
     <build>
