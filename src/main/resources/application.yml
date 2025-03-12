@@ -7,7 +7,7 @@ info:
   app:
     name: ACP Storage Service
     description: Simple ACP service to handle BLOBs (either file or remote on Azure)
-    version: 0.0.1
+    version: 0.0.2
 
 management:
   endpoints:
