@@ -1,22 +1,15 @@
 package uk.ac.ed.acpstorageservice.controller;
 
-import com.azure.core.util.BinaryData;
-import com.azure.storage.blob.BlobClient;
-import com.azure.storage.blob.BlobContainerClient;
-import com.azure.storage.blob.BlobServiceClient;
-import com.azure.storage.blob.BlobServiceClientBuilder;
+import com.azure.core.annotation.QueryParam;
 import com.google.gson.Gson;
 import org.springframework.lang.NonNull;
 import org.springframework.web.bind.annotation.*;
 import redis.clients.jedis.params.SetParams;
+import uk.ac.ed.acpstorageservice.configuration.AppConfig;
 import uk.ac.ed.acpstorageservice.data.RuntimeEnvironment;
 import uk.ac.ed.acpstorageservice.data.StorageDataDefinition;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.Map;
 import java.util.UUID;
 
 import redis.clients.jedis.JedisPool;
@@ -29,16 +22,14 @@ import redis.clients.jedis.JedisPool;
 @RestController()
 @RequestMapping("/api/v1")
 public class StorageServiceController {
-    public static final String FILE = "file";
-    public static final String BLOB = "blob";
-    public static final String MONGODB = "mongodb";
+
 
     public static final String TMP = "/tmp";
 
-    private final RuntimeEnvironment environment;
+    private final RuntimeEnvironment runtimeEnvironment;
 
-    public StorageServiceController(RuntimeEnvironment environment) {
-        this.environment = environment;
+    public StorageServiceController(RuntimeEnvironment runtimeEnvironment) {
+        this.runtimeEnvironment = runtimeEnvironment;
     }
 
     /**
@@ -48,7 +39,7 @@ public class StorageServiceController {
      */
     @GetMapping(value = "/targets")
     public String[] targets() {
-        return new String[]{FILE, BLOB};
+        return new String[]{"FILE", "BLOB"};
     }
 
 
@@ -62,7 +53,7 @@ public class StorageServiceController {
      */
     @PostMapping(value = "/{target}",  consumes = {"application/json"})
     public UUID write(@PathVariable() String target, @RequestBody String data) throws IOException {
-        return internalWrite(target, data);
+        return internalWrite(data);
     }
 
 
@@ -76,36 +67,23 @@ public class StorageServiceController {
      */
     @PostMapping(value = "/data_definition/{target}",  consumes = {"application/json"})
     public UUID writeStorageDataDefinition(@PathVariable() String target, @RequestBody StorageDataDefinition data) throws IOException {
-        return internalWrite(target, new Gson().toJson(data));
+        return internalWrite(new Gson().toJson(data));
     }
 
 
     /**
      * Writes data to a specified target (e.g., file or blob storage) and optionally stores it in Redis if enabled.
      *
-     * @param target the target to which the data should be written; must be either "FILE" or "BLOB"
      * @param data the content to be written to the specified target
      * @return a UUID representing the identifier for the written data
      * @throws IOException if an I/O error occurs while writing to the file or blob storage
      */
-    private UUID internalWrite(String target, String data) throws IOException {
-        UUID result = UUID.randomUUID();
-        target = target.toLowerCase();
+    private UUID internalWrite(String data) throws IOException {
+        UUID result = new AppConfig().StorageProvider(runtimeEnvironment).write(data);
 
-        switch (target){
-            case FILE:
-                Files.writeString(getFilePath(result.toString()), data, StandardCharsets.UTF_8);
-                break;
-            case BLOB:
-                getBlobClient(result).upload(BinaryData.fromString(data));
-                break;
-            default:
-                throw new RuntimeException("not supported");
-        }
-
-        if (environment.isUseRedis()) {
+        if (runtimeEnvironment.isUseRedis()) {
             // now store in Redis
-            try (JedisPool pool = new JedisPool(environment.getRedisHost(), environment.getRedisPort()); var jedis = pool.getResource()) {
+            try (JedisPool pool = new JedisPool(runtimeEnvironment.getRedisHost(), runtimeEnvironment.getRedisPort()); var jedis = pool.getResource()) {
                 var params = new SetParams();
                 params.ex(2);
                 jedis.set(result.toString(), data, params);
@@ -126,7 +104,7 @@ public class StorageServiceController {
      */
     @GetMapping(value = "/{source}/{uniqueId}")
     public String read(@PathVariable() String source, @PathVariable() UUID uniqueId) throws IOException {
-        return internalRead(source, uniqueId);
+        return internalRead(uniqueId);
     }
 
 
@@ -140,7 +118,7 @@ public class StorageServiceController {
      */
     @GetMapping(value = "/data_definition/{source}/{uniqueId}")
     public StorageDataDefinition readStorageDataDefinition(@PathVariable() String source, @PathVariable() UUID uniqueId) throws IOException {
-        return new Gson().fromJson(internalRead(source, uniqueId), StorageDataDefinition.class);
+        return new Gson().fromJson(internalRead(uniqueId), StorageDataDefinition.class);
     }
 
 
@@ -149,28 +127,22 @@ public class StorageServiceController {
      * to use (e.g., Redis, file system, or blob storage) and retrieves the corresponding data. If Redis is used,
      * it checks for data in a Redis store. Otherwise, it falls back to reading from a file or blob storage.
      *
-     * @param source the source type from which the data should be read (e.g., FILE, BLOB)
      * @param uniqueId the unique identifier of the data to be read
      * @return the retrieved data as a string
      * @throws IOException if an I/O error occurs during file operations
      */
-    private String internalRead(String source, UUID uniqueId) throws IOException {
-        source = source.toLowerCase();
+    private String internalRead(UUID uniqueId) throws IOException {
         String data = null;
 
-        if (environment.isUseRedis()) {
+        if (runtimeEnvironment.isUseRedis()) {
             // now store in Redis
-            try (JedisPool pool = new JedisPool(environment.getRedisHost(), environment.getRedisPort()); var jedis = pool.getResource()) {
+            try (JedisPool pool = new JedisPool(runtimeEnvironment.getRedisHost(), runtimeEnvironment.getRedisPort()); var jedis = pool.getResource()) {
                 data = jedis.get(uniqueId.toString());
             }
         }
 
         if (data == null) {
-            data = switch (source) {
-                case FILE -> Files.readString(getFilePath(uniqueId.toString()));
-                case BLOB -> getBlobClient(uniqueId).downloadContent().toString();
-                default -> throw new RuntimeException("not supported");
-            };
+            data = new AppConfig().StorageProvider(runtimeEnvironment).read(uniqueId);
         }
 
         return data;
@@ -178,7 +150,7 @@ public class StorageServiceController {
 
     /**
      * Deletes a resource specified by its unique identifier and source type.
-     * The source can be either a file or a blob. It also handles Redis cleanup if enabled in the environment.
+     * The source can be either a file or a blob. It also handles Redis cleanup if enabled in the runtimeEnvironment.
      *
      * @param source The type of the resource to delete (e.g., FILE or BLOB).
      * @param uniqueId The unique identifier of the resource to be deleted.
@@ -186,22 +158,12 @@ public class StorageServiceController {
      */
     @DeleteMapping(value = "/{source}/{uniqueId}")
     public void delete(@PathVariable() String source, @PathVariable() @NonNull UUID uniqueId) throws IOException {
-        source = source.toLowerCase();
 
         try {
-            switch (source){
-                case FILE:
-                    Files.delete(getFilePath(uniqueId.toString()));
-                    break;
-                case BLOB:
-                    getBlobClient(uniqueId).delete();
-                    break;
-                default:
-                    throw new RuntimeException("not supported");
-            }
+            new AppConfig().StorageProvider(runtimeEnvironment).delete(uniqueId);
 
-            if (environment.isUseRedis()) {
-                try (JedisPool pool = new JedisPool(environment.getRedisHost(), environment.getRedisPort()); var jedis = pool.getResource()) {
+            if (runtimeEnvironment.isUseRedis()) {
+                try (JedisPool pool = new JedisPool(runtimeEnvironment.getRedisHost(), runtimeEnvironment.getRedisPort()); var jedis = pool.getResource()) {
                     jedis.unlink(uniqueId.toString());
                 }
             }
@@ -221,87 +183,8 @@ public class StorageServiceController {
      * @throws IOException if an I/O error occurs while accessing the file system or blob storage
      * @throws RuntimeException if the specified source is unsupported
      */
-    @GetMapping(value = "/{source}")
-    public UUID[] list(@PathVariable() String source) throws IOException {
-        source = source.toLowerCase();
-        UUID[] result = new UUID[0];
-
-        switch (source){
-            case FILE:
-                result = Files.list(Path.of(TMP)).filter(f -> {
-                    try {
-                        UUID.fromString(f.getFileName().toString());
-                        return true;
-                    } catch (Exception x) {
-                        return false;
-                    }
-                }).map(e -> UUID.fromString(e.getFileName().toString())).toArray(UUID[]::new);
-                break;
-            case BLOB:
-                var blobContainerClient = getBlobContainerClient(getBlobServiceClient());
-                result = blobContainerClient.listBlobs().stream().filter(f -> {
-                    try {
-                        UUID.fromString(f.getName());
-                        return true;
-                    } catch (Exception x) {
-                        return false;
-                    }
-                }).map(e -> UUID.fromString(e.getName())).toArray(UUID[]::new);
-                break;
-            default:
-                throw new RuntimeException("not supported");
-        }
-
-        return result;
-    }
-
-    /**
-     * Retrieves configuration data as a map of key-value pairs.
-     <p>
-     * CODE LIKE THIS IS NOT SUPPOSED TO BE USED IN A PRODUCTION ENVIRONMENT
-     </p>
-     *
-     * @return a map where the key is a configuration property name and the value is the corresponding property value
-     */
-
-    /*
-    @GetMapping(value = "/configData")
-    public Map<String, String> getConfigData() {
-        return Map.of(
-                RuntimeEnvironment.ACP_STORAGE_CONNECTION, environment.getAcpStorageConnection(),
-                RuntimeEnvironment.ACP_BLOB_CONTAINER, environment.getAcpBlobContainerName(),
-                RuntimeEnvironment.USE_REDIS, environment.isUseRedis() ? "true" : "false",
-                RuntimeEnvironment.REDIS_HOST_ENV_VAR, environment.getRedisHost(),
-                RuntimeEnvironment.REDIS_PORT_ENV_VAR, String.valueOf(environment.getRedisPort()));
-    }
-    */
-
-    private Path getFilePath(String uniqueId){
-        return Path.of(TMP, uniqueId);
-    }
-
-    private BlobClient getBlobClient(UUID uniqueId){
-        var blobContainerClient = getBlobContainerClient(getBlobServiceClient());
-        return blobContainerClient.getBlobClient(uniqueId.toString());
-    }
-
-    private BlobServiceClient getBlobServiceClient(){
-        String azureConnectString = environment.getAcpStorageConnection();
-        if (azureConnectString == null || azureConnectString.isBlank()) {
-            throw new RuntimeException(RuntimeEnvironment.ACP_STORAGE_CONNECTION + " is not set");
-        }
-
-        // System.out.println("connect string: " + azureConnectString);
-
-        return new BlobServiceClientBuilder().connectionString(azureConnectString).buildClient();
-    }
-
-    private BlobContainerClient getBlobContainerClient(BlobServiceClient blobServiceClient) {
-        String azureContainerName = environment.getAcpBlobContainerName();
-        if (azureContainerName == null || azureContainerName.isBlank()) {
-            throw new RuntimeException(RuntimeEnvironment.ACP_BLOB_CONTAINER + " is not set");
-        }
-
-        return blobServiceClient.getBlobContainerClient(azureContainerName);
+    @GetMapping(value = "/{source}", produces = "application/json")
+    public UUID[] list(@PathVariable() String source, @QueryParam("limit") Integer limit) throws IOException {
+        return new AppConfig().StorageProvider(runtimeEnvironment).list(limit);
     }
 }

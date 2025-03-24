@@ -26,15 +26,27 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>bom</artifactId>
+                <version>2.23.0</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
         </dependencies>
     </dependencyManagement>
+
 
     <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
-
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+            <version>3.4.2</version>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
@@ -103,6 +115,15 @@
             <artifactId>azure-cosmos</artifactId>
             <version>LATEST</version>
         </dependency>
+
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>dynamodb</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>dynamodb-enhanced</artifactId>
+        </dependency>
     </dependencies>
 
     <build>
@@ -112,12 +133,17 @@
                 <artifactId>spring-boot-maven-plugin</artifactId>
 
                 <configuration>
-                    <environmentVariables>
+
+                    <!--
+                    <runtimeEnvironmentVariables>
                         <REDIS_HOST>localhost</REDIS_HOST>
                         <REDIS_PORT>6379</REDIS_PORT>
                         <USE_REDIS>true</USE_REDIS>
                         <ACP_BLOB_CONTAINER>acpcontainer</ACP_BLOB_CONTAINER>
-                        <ACP_STORAGE_CONNECTION>BlobEndpoint=https://acpstorage.blob.core.windows.net/acpcontainer?sp=racwdli&amp;st=2025-03-06T19:01:08Z&amp;se=2025-05-01T02:01:08Z&amp;spr=https&amp;sv=2022-11-02&amp;sr=c&amp;sig=cVrFc2NcsOZ3U%2BITpMd1T%2BVMSEOBCAekpZhYQEIrd20%3D</ACP_STORAGE_CONNECTION>                            </environmentVariables>
+                        <ACP_STORAGE_CONNECTION>BlobEndpoint=https://acpstorage.blob.core.windows.net/acpcontainer?sp=racwdli&amp;st=2025-03-06T19:01:08Z&amp;se=2025-05-01T02:01:08Z&amp;spr=https&amp;sv=2022-11-02&amp;sr=c&amp;sig=cVrFc2NcsOZ3U%2BITpMd1T%2BVMSEOBCAekpZhYQEIrd20%3D</ACP_STORAGE_CONNECTION>                            </runtimeEnvironmentVariables>
+
+                        -->
+
                 </configuration>
             </plugin>
         </plugins>
